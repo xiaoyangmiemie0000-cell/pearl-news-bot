@@ -17,7 +17,7 @@ from urllib.parse import quote, urljoin
 import requests
 from bs4 import BeautifulSoup
 
-# ── 日志配置 ─────────────────────────────────────────────
+# ─ 日志配置 ─────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -117,7 +117,7 @@ SUMMARY_PROMPT = """\
 📅 时间：[新闻发生的时间]
 📍 地点：[事件发生的地点]
 👤 人物/机构：[涉及的关键人物、品牌或机构]
- 事件：[用1-2句话概括核心事件]
+ 事件：[用 1-2 句话概括核心事件]
 💡 影响：[分析该事件对珍珠/珠宝行业的影响或意义]
 🔗 来源：[保留原始链接]
 
@@ -129,7 +129,7 @@ SUMMARY_PROMPT = """\
 """
 
 
-# ── 网络请求工具 ──────────────────────────────────────────
+# ── 网络请求工具 ─────────────────────────────────────────
 def safe_get(url: str, timeout: int = REQUEST_TIMEOUT) -> requests.Response | None:
     """带重试的 GET 请求"""
     for attempt in range(3):
@@ -191,7 +191,7 @@ def parse_sogou_news(keyword: str) -> list[dict]:
                 "source": source,
             })
         except Exception as e:
-            logger.debug(f"解析搜狗新闻条目失败: {e}")
+            logger.debug(f"解析搜狗新闻条目失败：{e}")
 
     return results
 
@@ -242,7 +242,7 @@ def parse_baidu_news(keyword: str) -> list[dict]:
                 "source": f"百度资讯 - {source}" if source else "百度资讯",
             })
         except Exception as e:
-            logger.debug(f"解析百度资讯条目失败: {e}")
+            logger.debug(f"解析百度资讯条目失败：{e}")
 
     return results
 
@@ -326,7 +326,7 @@ def llm_summarize(item: dict) -> str:
         data = resp.json()
         return data["choices"][0]["message"]["content"].strip()
     except Exception as e:
-        logger.warning(f"LLM 摘要失败: {e}")
+        logger.warning(f"LLM 摘要失败：{e}")
         return ""
 
 
@@ -343,7 +343,7 @@ def batch_summarize(items: list[dict], max_items: int = 15) -> list[dict]:
     logger.info(f"开始对 {len(items_to_summarize)} 条新闻进行 LLM 智能摘要...")
 
     for i, item in enumerate(items_to_summarize, 1):
-        logger.info(f"  [{i}/{len(items_to_summarize)}] 摘要: {item['title'][:40]}...")
+        logger.info(f"  [{i}/{len(items_to_summarize)}] 摘要：{item['title'][:40]}...")
         summary = llm_summarize(item)
         item["summary_llm"] = summary
         # 每次调用间隔，避免触发限流
@@ -410,10 +410,10 @@ def send_dingtalk(webhook_url: str, title: str, content: str) -> bool:
             logger.info("钉钉消息发送成功")
             return True
         else:
-            logger.error(f"钉钉消息发送失败: {result}")
+            logger.error(f"钉钉消息发送失败：{result}")
             return False
     except Exception as e:
-        logger.error(f"钉钉消息发送异常: {e}")
+        logger.error(f"钉钉消息发送异常：{e}")
         return False
 
 
@@ -452,9 +452,9 @@ def build_message(items: list[dict], date_str: str) -> tuple[str, str]:
     lines.append("---")
     has_llm = any(item.get("summary_llm") for item in items)
     if has_llm:
-        lines.append("*由 AI 智能摘要生成 · 数据来源: 搜狗新闻 / 百度资讯*")
+        lines.append("*由 AI 智能摘要生成 · 数据来源：搜狗新闻 / 百度资讯*")
     else:
-        lines.append("*由珍珠珠宝新闻机器人自动生成 · 数据来源: 搜狗新闻 / 百度资讯*")
+        lines.append("*由珍珠珠宝新闻机器人自动生成 · 数据来源：搜狗新闻 / 百度资讯*")
 
     content = "\n".join(lines)
 
@@ -474,7 +474,7 @@ def collect_news() -> list[dict]:
     logger.info("=== 开始抓取搜狗新闻 ===")
     all_keywords = KEYWORDS_CORE + KEYWORDS_BRAND + KEYWORDS_EVENT + KEYWORDS_TREND
     for kw in all_keywords:
-        logger.info(f"  搜索: {kw}")
+        logger.info(f"  搜索：{kw}")
         items = parse_sogou_news(kw)
         logger.info(f"  获取 {len(items)} 条")
         all_items.extend(items)
@@ -483,7 +483,7 @@ def collect_news() -> list[dict]:
     # 2. 百度资讯（备用数据源）
     logger.info("=== 开始抓取百度资讯 ===")
     for kw in KEYWORDS_CORE + KEYWORDS_EVENT:
-        logger.info(f"  搜索: {kw}")
+        logger.info(f"  搜索：{kw}")
         items = parse_baidu_news(kw)
         logger.info(f"  获取 {len(items)} 条")
         all_items.extend(items)
