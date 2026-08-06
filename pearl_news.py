@@ -1,6 +1,6 @@
 """
 珍珠珠宝新闻聚合器
-从多个渠道抓取珍珠/珠宝相关新闻，通过钉钉机器人推送摘要。
+从 Google News RSS、搜狗新闻等渠道抓取珍珠/珠宝相关新闻，通过钉钉机器人推送摘要。
 """
 
 import os
@@ -10,7 +10,7 @@ import time
 import hashlib
 import logging
 from datetime import datetime, timedelta
-from urllib.parse import quote, urljoin
+from urllib.parse import quote, urljoin, parse_qs, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -32,68 +32,28 @@ HEADERS = {
     "Accept-Language": "zh-CN,zh;q=0.9",
 }
 
-# 搜索关键词
+# 搜索关键词（覆盖新品、代言人、品牌、趋势等维度）
 KEYWORDS = [
-    "珍珠 新品",
-    "珍珠 代言人",
+    "珍珠 珠宝 新品",
+    "珍珠 代言人 品牌",
     "珍珠首饰 发布",
     "珠宝 珍珠 新款",
-    "珍珠 品牌 发布",
-    "淡水珍珠 新品",
-    "海水珍珠 拍卖",
-    "珍珠项链 明星",
-    "珠宝展 珍珠",
-    "珍珠 时尚 趋势",
+    "珍珠 拍卖 收藏",
+    "淡水珍珠 海水珍珠",
+    "珍珠项链 明星 同款",
+    "珠宝展 珍珠 展览",
+    "珍珠 时尚 趋势 2026",
+    "珍珠 品牌 营销",
 ]
 
 # 请求超时（秒）
-REQUEST_TIMEOUT = 15
+REQUEST_TIMEOUT = 20
 
 # 钉钉消息最大长度
 DINGTALK_MAX_LEN = 18000
 
-
-# ── 数据源定义 ────────────────────────────────────────────
-# 综合新闻
-SOURCES_NEWS = [
-    {
-        "name": "百度新闻",
-        "url_tpl": "https://www.baidu.com/s?wd={kw}&tn=news&rn=10",
-        "parser": "baidu_news",
-    },
-    {
-        "name": "搜狗新闻",
-        "url_tpl": "https://news.sogou.com/news?query={kw}&sort=1",
-        "parser": "sogou_news",
-    },
-]
-
-# 珠宝行业网站
-SOURCES_INDUSTRY = [
-    {
-        "name": "中国珠宝网",
-        "url": "https://www.zhubao.cn",
-        "parser": "zhubao_cn",
-    },
-]
-
-# 社交媒体
-SOURCES_SOCIAL = [
-    {
-        "name": "微博搜索",
-        "url_tpl": "https://s.weibo.com/weibo?q={kw}&timescope=custom:today",
-        "parser": "weibo",
-    },
-]
-
-# 电商平台
-SOURCES_ECOM = [
-    {
-        "name": "京东搜索",
-        "url_tpl": "https://search.jd.com/Search?keyword={kw}&enc=utf-8",
-        "parser": "jd",
-    },
-]
+# 过滤词（排除不相关内容）
+FILTER_WORDS = ["珍珠奶茶", "奶茶", "游戏", "手游", "王者荣耀", "股票", "基金", "彩票"]
 
 
 # ── 网络请求工具 ──────────────────────────────────────────
@@ -106,71 +66,100 @@ def safe_get(url: str, timeout: int = REQUEST_TIMEOUT) -> requests.Response | No
             return resp
         except Exception as e:
             logger.warning(f"请求失败 (第{attempt+1}次): {url} -> {e}")
-            time.sleep(1)
+            time.sleep(2)
     return None
 
 
-def detect_encoding(resp: requests.Response) -> str:
-    """检测网页编码"""
-    if resp.encoding and resp.encoding.lower() != "iso-8859-1":
-        return resp.encoding
-    # 从内容推断
-    content_lower = resp.content[:2000].decode("ascii", errors="ignore").lower()
-    if "gbk" in content_lower or "gb2312" in content_lower:
-        return "gbk"
-    return "utf-8"
-
-
 # ── 解析器 ────────────────────────────────────────────────
-def parse_baidu_news(resp: requests.Response) -> list[dict]:
-    """解析百度新闻搜索结果"""
+def parse_google_news_rss(keyword: str) -> list[dict]:
+    """通过 Google News RSS 搜索新闻"""
     results = []
-    resp.encoding = detect_encoding(resp)
-    soup = BeautifulSoup(resp.text, "html.parser")
+    url = (
+        f"https://news.google.com/rss/search?"
+        f"q={quote(keyword)}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+    )
+    resp = safe_get(url)
+    if not resp:
+        return results
 
-    for item in soup.select(".result"):
+    soup = BeautifulSoup(resp.text, "xml")
+    items = soup.find_all("item")
+
+    for item in items:
         try:
-            title_tag = item.select_one("h3 a")
-            if not title_tag:
+            title = item.find("title")
+            link = item.find("link")
+            pub_date = item.find("pubDate")
+            source = item.find("source")
+
+            if not title:
                 continue
-            title = title_tag.get_text(strip=True)
-            link = title_tag.get("href", "")
 
-            summary = ""
-            summary_tag = item.select_one(".c-summary") or item.select_one(".c-abstract")
-            if summary_tag:
-                summary = summary_tag.get_text(strip=True)[:200]
+            title_text = title.text.strip()
+            # 过滤不相关内容
+            if any(fw in title_text for fw in FILTER_WORDS):
+                continue
 
-            source = ""
-            source_tag = item.select_one(".c-author span") or item.select_one(".c-color-gray")
-            if source_tag:
-                source = source_tag.get_text(strip=True)
+            link_text = link.text.strip() if link else ""
+            date_text = pub_date.text.strip() if pub_date else ""
+            source_text = source.text.strip() if source else "Google News"
 
-            if title and link:
-                results.append({
-                    "title": title,
-                    "url": link,
-                    "summary": summary,
-                    "source": f"百度新闻 - {source}" if source else "百度新闻",
-                })
+            # 尝试获取真实链接（Google News 会重定向）
+            real_url = resolve_google_news_url(link_text)
+
+            results.append({
+                "title": title_text,
+                "url": real_url or link_text,
+                "summary": "",
+                "source": source_text,
+                "date": date_text,
+            })
         except Exception as e:
-            logger.debug(f"解析百度新闻条目失败: {e}")
+            logger.debug(f"解析 Google News RSS 条目失败: {e}")
 
     return results
 
 
-def parse_sogou_news(resp: requests.Response) -> list[dict]:
+def resolve_google_news_url(google_url: str) -> str:
+    """尝试从 Google News 重定向 URL 中提取真实 URL"""
+    if not google_url:
+        return ""
+    try:
+        parsed = urlparse(google_url)
+        if "news.google.com" in parsed.netloc:
+            # Google News RSS 链接通常包含 oc 参数
+            # 尝试直接访问获取重定向
+            resp = requests.head(google_url, headers=HEADERS, timeout=5, allow_redirects=True)
+            return resp.url
+    except Exception:
+        pass
+    return google_url
+
+
+def parse_sogou_news(keyword: str) -> list[dict]:
     """解析搜狗新闻搜索结果"""
     results = []
-    resp.encoding = detect_encoding(resp)
+    url = f"https://news.sogou.com/news?query={quote(keyword)}&sort=1"
+    resp = safe_get(url)
+    if not resp:
+        return results
+
+    # 搜狗返回的编码需要特殊处理
+    resp.encoding = resp.apparent_encoding or "utf-8"
     soup = BeautifulSoup(resp.text, "html.parser")
 
-    for item in soup.select(".news-list li") or soup.select(".vrwrap"):
+    # 尝试多种选择器
+    items = soup.select(".news-list li") or soup.select(".vrwrap") or soup.select(".result")
+
+    for item in items:
         try:
             title_tag = item.select_one("h3 a") or item.select_one("a")
             if not title_tag:
                 continue
             title = title_tag.get_text(strip=True)
+            if any(fw in title for fw in FILTER_WORDS):
+                continue
+
             link = title_tag.get("href", "")
             if link and not link.startswith("http"):
                 link = urljoin("https://news.sogou.com", link)
@@ -180,142 +169,25 @@ def parse_sogou_news(resp: requests.Response) -> list[dict]:
             if summary_tag:
                 summary = summary_tag.get_text(strip=True)[:200]
 
-            if title:
-                results.append({
-                    "title": title,
-                    "url": link,
-                    "summary": summary,
-                    "source": "搜狗新闻",
-                })
+            results.append({
+                "title": title,
+                "url": link,
+                "summary": summary,
+                "source": "搜狗新闻",
+                "date": "",
+            })
         except Exception as e:
             logger.debug(f"解析搜狗新闻条目失败: {e}")
 
     return results
 
 
-def parse_zhubao_cn(resp: requests.Response) -> list[dict]:
-    """解析中国珠宝网首页新闻"""
-    results = []
-    resp.encoding = detect_encoding(resp)
-    soup = BeautifulSoup(resp.text, "html.parser")
-
-    for a_tag in soup.select("a[href]"):
-        try:
-            title = a_tag.get_text(strip=True)
-            if len(title) < 6 or len(title) > 80:
-                continue
-            # 过滤包含珍珠/珠宝关键词的链接
-            if not any(kw in title for kw in ["珍珠", "珠宝", "首饰", "饰品", "新品", "发布"]):
-                continue
-            link = a_tag.get("href", "")
-            if link and not link.startswith("http"):
-                link = urljoin("https://www.zhubao.cn", link)
-            results.append({
-                "title": title,
-                "url": link,
-                "summary": "",
-                "source": "中国珠宝网",
-            })
-        except Exception as e:
-            logger.debug(f"解析中国珠宝网条目失败: {e}")
-
-    # 去重
-    seen = set()
-    unique = []
-    for r in results:
-        if r["title"] not in seen:
-            seen.add(r["title"])
-            unique.append(r)
-    return unique[:15]
-
-
-def parse_weibo(resp: requests.Response) -> list[dict]:
-    """解析微博搜索结果"""
-    results = []
-    resp.encoding = "utf-8"
-    soup = BeautifulSoup(resp.text, "html.parser")
-
-    for card in soup.select(".card-wrap"):
-        try:
-            content_tag = card.select_one("p.txt") or card.select_one(".txt")
-            if not content_tag:
-                continue
-            text = content_tag.get_text(strip=True)[:200]
-            if len(text) < 10:
-                continue
-
-            action_tag = card.select_one("a[action-type='feed_list_detail']")
-            link = ""
-            if action_tag:
-                href = action_tag.get("href", "")
-                link = urljoin("https://s.weibo.com", href) if href else ""
-
-            results.append({
-                "title": text[:60] + ("..." if len(text) > 60 else ""),
-                "url": link,
-                "summary": text,
-                "source": "微博",
-            })
-        except Exception as e:
-            logger.debug(f"解析微博条目失败: {e}")
-
-    return results
-
-
-def parse_jd(resp: requests.Response) -> list[dict]:
-    """解析京东搜索结果（新品信息）"""
-    results = []
-    resp.encoding = "utf-8"
-    soup = BeautifulSoup(resp.text, "html.parser")
-
-    for item in soup.select(".gl-item") or soup.select("li.gl-i"):
-        try:
-            title_tag = item.select_one(".p-name a em") or item.select_one(".p-name a")
-            if not title_tag:
-                continue
-            title = title_tag.get_text(strip=True)
-            if len(title) < 5:
-                continue
-
-            link_tag = item.select_one(".p-name a")
-            link = link_tag.get("href", "") if link_tag else ""
-            if link and not link.startswith("http"):
-                link = "https:" + link
-
-            price_tag = item.select_one(".p-price strong i")
-            price = f"¥{price_tag.get_text(strip=True)}" if price_tag else ""
-
-            summary = f"价格: {price}" if price else ""
-
-            results.append({
-                "title": title[:60],
-                "url": link,
-                "summary": summary,
-                "source": "京东",
-            })
-        except Exception as e:
-            logger.debug(f"解析京东条目失败: {e}")
-
-    return results[:10]
-
-
-# 解析器注册表
-PARSERS = {
-    "baidu_news": parse_baidu_news,
-    "sogou_news": parse_sogou_news,
-    "zhubao_cn": parse_zhubao_cn,
-    "weibo": parse_weibo,
-    "jd": parse_jd,
-}
-
-
-# ── 新闻去重与排序 ────────────────────────────────────────
+# ── 新闻去重与过滤 ────────────────────────────────────────
 def deduplicate(items: list[dict]) -> list[dict]:
-    """基于标题相似度去重"""
+    """基于标题去重"""
     seen_hashes = set()
     unique = []
     for item in items:
-        # 用标题的哈希做简单去重
         h = hashlib.md5(item["title"].encode()).hexdigest()
         if h not in seen_hashes:
             seen_hashes.add(h)
@@ -323,7 +195,24 @@ def deduplicate(items: list[dict]) -> list[dict]:
     return unique
 
 
-# ── 钉钉推送 ──────────────────────────────────────────────
+def filter_relevant(items: list[dict]) -> list[dict]:
+    """过滤出与珍珠/珠宝强相关的新闻"""
+    relevant_keywords = [
+        "珍珠", "珠宝", "首饰", "饰品", "项链", "手链", "戒指",
+        "耳环", "胸针", "皇冠", "Mikimoto", "御木本", "京润",
+        "阮仕", "天使之泪", "黛米", "周大福", "周生生", "老凤祥",
+        "卡地亚", "蒂芙尼", "宝格丽", "梵克雅宝", "海瑞温斯顿",
+        "拍卖", "珠宝展", "代言人", "新品", "发布", "高定",
+    ]
+    filtered = []
+    for item in items:
+        title = item.get("title", "")
+        if any(kw in title for kw in relevant_keywords):
+            filtered.append(item)
+    return filtered
+
+
+# ── 钉钉推送 ─────────────────────────────────────────────
 def send_dingtalk(webhook_url: str, title: str, content: str) -> bool:
     """通过钉钉机器人 Webhook 发送 Markdown 消息"""
     payload = {
@@ -367,22 +256,33 @@ def build_message(items: list[dict], date_str: str) -> tuple[str, str]:
         by_source.setdefault(src, []).append(item)
 
     for source, source_items in by_source.items():
-        lines.append(f"### 📌 {source}\n")
-        for i, item in enumerate(source_items[:5], 1):
+        lines.append(f"###  {source}\n")
+        for i, item in enumerate(source_items[:8], 1):
             title_text = item["title"]
             url = item.get("url", "")
+            date_info = item.get("date", "")
+
             if url:
                 lines.append(f"{i}. [{title_text}]({url})")
             else:
                 lines.append(f"{i}. {title_text}")
-            if item.get("summary"):
-                lines.append(f"   > {item['summary'][:100]}\n")
+
+            meta_parts = []
+            if date_info:
+                # 简化日期显示
+                try:
+                    dt = datetime.strptime(date_info, "%a, %d %b %Y %H:%M:%S %Z")
+                    meta_parts.append(dt.strftime("%m-%d %H:%M"))
+                except Exception:
+                    meta_parts.append(date_info[:16])
+            if meta_parts:
+                lines.append(f"   > 📅 {' | '.join(meta_parts)}\n")
             else:
                 lines.append("")
         lines.append("")
 
     lines.append("---")
-    lines.append("*由珍珠珠宝新闻机器人自动生成*")
+    lines.append("*由珍珠珠宝新闻机器人自动生成 · 数据来源: Google News / 搜狗新闻*")
 
     content = "\n".join(lines)
 
@@ -398,67 +298,35 @@ def collect_news() -> list[dict]:
     """从所有数据源收集新闻"""
     all_items = []
 
-    # 1. 综合新闻（按关键词搜索）
-    for source in SOURCES_NEWS:
-        parser_fn = PARSERS.get(source["parser"])
-        if not parser_fn:
-            continue
-        for kw in KEYWORDS[:5]:  # 限制关键词数量避免请求过多
-            url = source["url_tpl"].format(kw=quote(kw))
-            logger.info(f"抓取: {source['name']} - {kw}")
-            resp = safe_get(url)
-            if resp:
-                items = parser_fn(resp)
-                logger.info(f"  获取 {len(items)} 条")
-                all_items.extend(items)
-            time.sleep(1)  # 礼貌间隔
+    # 1. Google News RSS（主力数据源，每个关键词取前10条）
+    logger.info("=== 开始抓取 Google News RSS ===")
+    for kw in KEYWORDS:
+        logger.info(f"  搜索: {kw}")
+        items = parse_google_news_rss(kw)
+        logger.info(f"  获取 {len(items)} 条")
+        all_items.extend(items)
+        time.sleep(1)  # 礼貌间隔
 
-    # 2. 珠宝行业网站
-    for source in SOURCES_INDUSTRY:
-        parser_fn = PARSERS.get(source["parser"])
-        if not parser_fn:
-            continue
-        logger.info(f"抓取: {source['name']}")
-        resp = safe_get(source["url"])
-        if resp:
-            items = parser_fn(resp)
-            logger.info(f"  获取 {len(items)} 条")
-            all_items.extend(items)
+    # 2. 搜狗新闻（补充数据源）
+    logger.info("=== 开始抓取搜狗新闻 ===")
+    for kw in KEYWORDS[:5]:  # 限制关键词数量
+        logger.info(f"  搜索: {kw}")
+        items = parse_sogou_news(kw)
+        logger.info(f"  获取 {len(items)} 条")
+        all_items.extend(items)
         time.sleep(1)
-
-    # 3. 社交媒体
-    for source in SOURCES_SOCIAL:
-        parser_fn = PARSERS.get(source["parser"])
-        if not parser_fn:
-            continue
-        for kw in KEYWORDS[:3]:
-            url = source["url_tpl"].format(kw=quote(kw))
-            logger.info(f"抓取: {source['name']} - {kw}")
-            resp = safe_get(url)
-            if resp:
-                items = parser_fn(resp)
-                logger.info(f"  获取 {len(items)} 条")
-                all_items.extend(items)
-            time.sleep(2)
-
-    # 4. 电商平台
-    for source in SOURCES_ECOM:
-        parser_fn = PARSERS.get(source["parser"])
-        if not parser_fn:
-            continue
-        for kw in KEYWORDS[:3]:
-            url = source["url_tpl"].format(kw=quote(kw))
-            logger.info(f"抓取: {source['name']} - {kw}")
-            resp = safe_get(url)
-            if resp:
-                items = parser_fn(resp)
-                logger.info(f"  获取 {len(items)} 条")
-                all_items.extend(items)
-            time.sleep(2)
 
     # 去重
     unique_items = deduplicate(all_items)
     logger.info(f"总计收集 {len(all_items)} 条，去重后 {len(unique_items)} 条")
+
+    # 过滤出珍珠/珠宝相关内容
+    relevant_items = filter_relevant(unique_items)
+    logger.info(f"过滤后保留 {len(relevant_items)} 条相关新闻")
+
+    # 如果没有过滤到相关内容，就返回去重后的全部结果
+    if relevant_items:
+        return relevant_items
     return unique_items
 
 
@@ -466,32 +334,29 @@ def main():
     """主入口"""
     # 获取钉钉 Webhook
     webhook_url = os.environ.get("DINGTALK_WEBHOOK")
-    if not webhook_url:
-        logger.error("未设置 DINGTALK_WEBHOOK 环境变量！")
-        logger.info("请在 GitHub Settings > Secrets 中设置 DINGTALK_WEBHOOK")
-        # 本地测试时输出到控制台
-        items = collect_news()
-        date_str = datetime.now().strftime("%Y-%m-%d")
-        title, content = build_message(items, date_str)
-        print("\n" + "=" * 60)
-        print(title)
-        print("=" * 60)
-        print(content)
-        return
 
     # 收集新闻
     items = collect_news()
 
     if not items:
-        logger.warning("未收集到任何新闻，跳过推送")
+        logger.warning("未收集到任何新闻")
+        if not webhook_url:
+            print("\n未收集到任何新闻，请检查网络连接或关键词设置。")
         return
 
     # 构建消息
     date_str = datetime.now().strftime("%Y-%m-%d")
     title, content = build_message(items, date_str)
 
-    # 发送钉钉
-    send_dingtalk(webhook_url, title, content)
+    if webhook_url:
+        # 生产模式：发送钉钉
+        send_dingtalk(webhook_url, title, content)
+    else:
+        # 测试模式：输出到控制台
+        print("\n" + "=" * 60)
+        print(title)
+        print("=" * 60)
+        print(content)
 
 
 if __name__ == "__main__":
