@@ -59,24 +59,30 @@ HOT_MIN_COUNT = 3              # 热点条数 >=3 才走正常模式
 NORMAL_MAX_COUNT = 8           # 正常模式最多推送条数
 FALLBACK_MAX_COUNT = 4         # 降级模式最多推送条数
 
-# 搜索关键词 - 分组策略（大幅扩充，覆盖整个珠宝行业）
+# 搜索关键词 - 分组策略（全部聚焦"珍珠"品类，可与其他品类组合）
 KEYWORDS_CORE = [
-    "珍珠", "珠宝", "珍珠项链", "珍珠首饰", "珍珠手链", "珍珠耳环",
+    "珍珠", "珍珠项链", "珍珠首饰", "珍珠手链", "珍珠耳环",
+    "珍珠戒指", "珍珠胸针", "珍珠吊坠", "珍珠手镯",
 ]
 KEYWORDS_INDUSTRY = [
-    "钻石 珠宝", "黄金 价格", "翡翠 市场", "宝石 展览",
-    "珠宝 新品发布", "珠宝 品牌", "珠宝 拍卖", "珠宝 高定",
-    "珠宝 时尚", "珠宝 趋势", "奢侈品 珠宝", "腕表 新品",
-    "珠宝 进出口", "黄金 消费", "培育钻石",
+    # 珍珠与其他品类的组合（必须含珍珠）
+    "珍珠 黄金", "珍珠 钻石", "珍珠 翡翠", "珍珠 宝石",
+    "珍珠 K金", "珍珠 铂金", "珍珠 彩宝", "珍珠 祖母绿",
+    # 珍珠产业/工艺
+    "培育珍珠", "淡水珍珠", "海水珍珠", "Akoya珍珠", "巴洛克珍珠",
+    "珍珠 养殖", "珍珠 产区", "珍珠 产量", "珍珠 进出口",
+    # 珍珠市场/趋势
+    "珍珠 价格", "珍珠 市场", "珍珠 消费", "珍珠 趋势",
+    "珍珠 新品发布", "珍珠 高定", "珍珠 时尚", "珍珠 拍卖",
 ]
 KEYWORDS_EVENT = [
-    "珠宝展", "珠宝 博览会", "珠宝 大会", "珠宝 论坛",
-    "珍珠 代言人", "珠宝 代言人", "珠宝 联名",
-    "苏富比 珠宝", "佳士得 珠宝", "保利 珠宝",
+    "珍珠 展会", "珍珠 博览会", "珍珠 大会", "珍珠 论坛",
+    "珍珠 代言人", "珍珠 联名", "珠宝展 珍珠",
+    "苏富比 珍珠", "佳士得 珍珠", "保利 珍珠",
 ]
 KEYWORDS_CELEBRITY = [
-    "明星 珠宝", "红毯 珠宝", "珠宝 明星", "珠宝 KOL",
-    "珠宝 同款", "珠宝 带货",
+    "明星 珍珠", "红毯 珍珠", "珍珠 明星", "珍珠 KOL",
+    "珍珠 同款", "珍珠 带货", "珍珠 佩戴",
 ]
 
 # 过滤词（仅保留明确无关的噪声词，避免误杀品牌新品/电商内容）
@@ -96,43 +102,42 @@ EXCLUDE_DOMAINS = [
     "gpai.net",
 ]
 
-# 行业核心词：标题或摘要含任一词即视为珠宝行业相关
-# 覆盖珍珠、钻石、黄金、翡翠、宝石、彩宝、腕表等全品类
-INDUSTRY_CORE_WORDS = [
-    # 品类
-    "珍珠", "钻石", "黄金", "翡翠", "宝石", "彩宝", "红蓝宝",
-    "祖母绿", "和田玉", "白玉", "铂金", "K金", "18K",
-    "腕表", "手表", "高级制表",
-    # 品类词
-    "珠宝", "首饰", "饰品", "项链", "手链", "戒指", "耳环",
-    "耳钉", "手镯", "吊坠", "胸针", "皇冠", "头饰", "脚链",
-    # 工艺/技术
-    "高定", "高级珠宝", "定制珠宝", "天然宝石", "培育钻石", "人工钻石",
-    "GIA", "NGTC", "GRS",
+# 珍珠品类核心词：标题或摘要含任一词即视为珍珠相关
+# 注意：必须是"珍珠"字样或含"珍珠"的组合词，不包含单独的黄金/钻石/翡翠/腕表
+PEARL_CORE_WORDS = [
+    # 珍珠本词
+    "珍珠", "真珠",
+    # 珍珠品类细分
+    "淡水珍珠", "海水珍珠", "Akoya", "巴洛克珍珠", "南洋珍珠",
+    "黑珍珠", "金珍珠", "澳白珍珠", "爱迪生珍珠",
+    "培育珍珠", "人工珍珠", "贝珠", "塑料珍珠",
+    # 珍珠首饰
+    "珍珠项链", "珍珠手链", "珍珠耳环", "珍珠戒指", "珍珠胸针",
+    "珍珠吊坠", "珍珠手镯", "珍珠头饰", "珍珠脚链",
+    # 珍珠+其他品类组合
+    "珍珠黄金", "珍珠钻石", "珍珠翡翠", "珍珠宝石", "珍珠彩宝",
+    "珍珠铂金", "珍珠K金", "珍珠祖母绿",
 ]
 
-# 名气信号词：标题或摘要命中即通过（即使不含"珍珠/珠宝"品类词）
-# 涵盖知名品牌、明星、拍卖行、展会、行业机构
+# 名气信号词（珍珠相关品牌/名人/机构）
+# 注意：名气词命中时，标题或摘要中仍需含"珍珠"字样才能通过
+# （避免"卡地亚发布腕表"这种不涉珍珠的内容误入）
 FAMOUS_BRANDS = [
-    # 国际顶级
+    # 珍珠专业品牌（强相关）
+    "Mikimoto", "御木本", "TASAKI", "塔思琦",
+    "京润珍珠", "阮仕珍珠", "天使之泪", "千足珍珠",
+    "黛米", "欧诗漫", "山下湖", "佳丽珍珠",
+    # 综合珠宝品牌（含珍珠产品线）
     "卡地亚", "Cartier", "蒂芙尼", "Tiffany", "宝格丽", "Bulgari",
     "梵克雅宝", "Van Cleef", "伯爵", "Piaget",
     "海瑞温斯顿", "Harry Winston", "格拉夫", "Graff",
-    "布契拉提", "Buccellati", "CINDY CHAO",
-    # 国际知名
-    "Pandora", "潘多拉", "TASAKI", "塔思琦",
-    "Mikimoto", "御木本", "APM", "POMELLATO",
-    # 中国知名
+    "Pandora", "潘多拉", "APM", "POMELLATO", "CINDY CHAO",
     "周大福", "周生生", "老凤祥", "六福珠宝", "周宝生",
     "金至尊", "谢瑞麟", "潮宏基", "老庙", "明牌",
-    "京润珍珠", "阮仕珍珠", "黛米", "淡水珍珠", "千足珍珠",
-    "TTF", "轩灵", "CYoung", "张小葱",
-    # 腕表品牌
-    "劳力士", "Rolex", "百达翡丽", "Patek Philippe",
-    "欧米茄", "Omega", "万国", "IWC", "卡西欧",
+    "TTF", "轩灵", "CYoung",
 ]
 
-# 行业名人/IP（持续扩充）
+# 行业名人/IP（命中时仍需标题/摘要含"珍珠"）
 FAMOUS_PEOPLE = [
     # 珠宝行业KOL/设计师
     "郭培", "Guo Pei", "兰玉", "刘嘉玲", "赵雅芝",
@@ -143,14 +148,45 @@ FAMOUS_PEOPLE = [
     "苏富比", "Sotheby", "佳士得", "Christie",
     "保利", "北京保利", "中国嘉德", "嘉德",
     # 大型展会
-    "进博会", "消博会", "珠博会", "珠宝展", "钟表展",
-    "巴塞尔", "Basel", "日内瓦", "日内瓦钟表展",
+    "进博会", "消博会", "珠博会", "珠宝展",
     # 行业协会
     "中宝协", "GAC", "中国珠宝玉石首饰行业协会",
 ]
 
-# 地名误判排除：标题含"珍珠河/港/岛/镇"等且无珠宝首饰词时排除
-PLACE_NAME_PATTERN = re.compile(r"珍珠[河港岛镇村湾半岛山]")
+# 负面信息筛选词（用于识别行业乱象类内容）
+# 命中后需进一步判断传播度：是否权威媒体、是否含强信号词
+NEGATIVE_SIGNAL_WORDS = [
+    "诈骗", "骗局", "欺诈", "售假", "造假", "虚假",
+    "套路", "乱象", "潜规则", "暴利", "水很深",
+    "跑路", "维权", "投诉", "曝光", "查处", "通报",
+    "立案", "调查", "退市", "关注函", "处罚", "罚款",
+    "真假", "以次充好", "染色", "漂白", "假冒",
+]
+
+# 负面信息传播度强信号（命中任一即视为有传播度）
+# 用于过滤零散个人投诉/小账号吐槽
+NEGATIVE_IMPACT_WORDS = [
+    "警方", "公安", "刑拘", "抓获", "团伙", "涉案",
+    "亿元", "万元", "千万", "百万元",
+    "央视", "新华社", "人民日报", "光明日报", "经济日报",
+    "省公安", "监管部门", "证监会", "市监", "海关",
+    "立案调查", "强制退市", "关注函", "集群战役",
+    "全链条", "收网", "排查", "约谈",
+]
+
+# 权威媒体来源（用于负面信息传播度判断）
+AUTHORITIVE_SOURCES = [
+    "新华社", "人民日报", "央视", "CCTV", "光明日报", "经济日报",
+    "中新网", "中国新闻网", "环球时报", "参考消息",
+    "财经", "证券", "21世纪", "第一财经", "界面新闻",
+    "南方日报", "南方周末", "南方都市报", "广州日报",
+    "北京日报", "北京青年报", "新京报", "澎湃新闻",
+    "新华网", "人民网", "央视网", "中国网",
+]
+
+# 地名误判排除：标题含"珍珠河/港/岛/镇/路"等且无珠宝首饰词时排除
+# 覆盖"珍珠河最热""珍珠路2号"等地址误判
+PLACE_NAME_PATTERN = re.compile(r"珍珠[河港岛镇村湾半岛山路大街]")
 
 # 主题分类词典：关键词 -> (主题key)
 TOPIC_RULES = [
@@ -605,27 +641,51 @@ def merge_similar(items: list[dict]) -> list[dict]:
 
 
 # ── 过滤 ──────────────────────────────────────────────────
+def is_high_impact_negative(item: dict, combined_text: str) -> bool:
+    """
+    判断负面信息是否具备足够传播度（仅保留有传播度、引发广泛讨论、
+    影响消费者整体信任度的负面话题）。
+    条件：负面信号词命中 AND (传播度强信号词命中 OR 权威媒体来源)
+    """
+    # 必须先命中负面信号词，才算负面信息
+    if not any(w in combined_text for w in NEGATIVE_SIGNAL_WORDS):
+        return False  # 不是负面信息，交给正常流程
+
+    # 是负面信息，需进一步验证传播度
+    has_impact = any(w in combined_text for w in NEGATIVE_IMPACT_WORDS)
+    source = item.get("source", "")
+    has_authority = any(a in source for a in AUTHORITIVE_SOURCES)
+
+    return has_impact or has_authority
+
+
 def filter_relevant(items: list[dict]) -> list[dict]:
     """
-    双轨过滤：
-    轨道1（行业核心词）：标题或摘要含珠宝/钻石/黄金/翡翠/腕表等品类词 → 通过
-    轨道2（名气信号词）：标题或摘要含知名品牌/明星/拍卖行/展会名 → 通过
-    （即使不含品类词也通过，因为"卡地亚新品""苏富比拍卖"本身就是珠宝行业内容）
+    珍珠品类聚焦过滤 + 负面信息传播度筛选。
+
+    规则：
+    1. 标题或摘要必须含"珍珠"字样（PEARL_CORE_WORDS 命中）—— 确保品类聚焦
+    2. 名气信号词（品牌/明星/拍卖行）作为加分项，但不单独触发通过
+    3. 负面信息：必须命中负面信号词 AND 满足传播度条件（强信号词 OR 权威媒体）
+       - 零散个人投诉/小账号吐槽直接过滤
+       - 通过的负面内容打上 _is_negative 标记，后续按热度排序
     """
-    # 预编译：行业核心词（覆盖 title + summary）
-    industry_re = re.compile("|".join(re.escape(w) for w in INDUSTRY_CORE_WORDS), re.I)
-    # 名气信号词（覆盖 title + summary + url）
+    # 预编译：珍珠品类核心词
+    pearl_re = re.compile("|".join(re.escape(w) for w in PEARL_CORE_WORDS), re.I)
+    # 名气信号词
     fame_words = FAMOUS_BRANDS + FAMOUS_PEOPLE
     fame_re = re.compile("|".join(re.escape(w) for w in fame_words), re.I)
+    # 负面信号词
+    negative_re = re.compile("|".join(re.escape(w) for w in NEGATIVE_SIGNAL_WORDS), re.I)
 
     filtered = []
+    negative_dropped = 0
     for item in items:
         title = item.get("title", "")
         summary = item.get("summary", "")
         source = item.get("source", "")
         url = item.get("url", "")
 
-        # 构建综合搜索文本：标题权重最高，摘要次之
         combined_text = f"{title} {summary}"
         combined_lower = f"{title} {summary} {source} {url}".lower()
 
@@ -635,19 +695,68 @@ def filter_relevant(items: list[dict]) -> list[dict]:
         if any(ex in combined_lower for ex in EXCLUDE_DOMAINS):
             continue
 
-        # 地名误判排除
-        if PLACE_NAME_PATTERN.search(title) and not industry_re.search(combined_text):
+        # 地名误判排除：标题或摘要含"珍珠路/河/港"等且无真正的珍珠首饰词
+        # 处理"珍珠路2号""珍珠河最热"等地址/天气误判
+        if PLACE_NAME_PATTERN.search(combined_text):
+            # 去掉地名上下文后再判断是否还有真正的珍珠内容
+            text_without_places = PLACE_NAME_PATTERN.sub("", combined_text)
+            if not pearl_re.search(text_without_places):
+                continue
+            # 二次确认：剩余的"珍珠"是否都在首饰/珠宝上下文
+            # 检查是否含明确的首饰/珠宝品类词
+            jewelry_words = ["项链", "手链", "耳环", "戒指", "胸针", "吊坠",
+                             "手镯", "头饰", "首饰", "饰品", "珠宝", "配饰",
+                             "佩戴", "珍珠文化", "珍珠之都", "珍珠产业"]
+            if not any(w in text_without_places for w in jewelry_words):
+                continue
+
+        # ★ 核心规则1：必须含"珍珠"字样
+        has_pearl = bool(pearl_re.search(combined_text))
+        if not has_pearl:
             continue
 
-        # 双轨判断
-        has_industry = bool(industry_re.search(combined_text))
-        has_fame = bool(fame_re.search(combined_text))
+        # ★ 核心规则2：负面信息传播度筛选
+        is_negative = bool(negative_re.search(combined_text))
+        if is_negative:
+            if not is_high_impact_negative(item, combined_text):
+                negative_dropped += 1
+                continue
+            item["_is_negative"] = True  # 标记，供排序使用
 
-        if has_industry or has_fame:
-            filtered.append(item)
+        # 名气信号词作为加分标记（不单独触发通过）
+        if fame_re.search(combined_text):
+            item["_has_fame"] = True
 
-    logger.info(f"相关性过滤: {len(items)} -> {len(filtered)} 条")
+        filtered.append(item)
+
+    logger.info(f"相关性过滤: {len(items)} -> {len(filtered)} 条"
+                f"（负面过滤剔除 {negative_dropped} 条低传播度）")
     return filtered
+
+
+def sort_by_popularity(items: list[dict]) -> list[dict]:
+    """
+    按热度/传播度排序：
+    - 负面信息优先按传播度排序（强信号词多的在前）
+    - 名气信号词命中的优先
+    - 有发布时间的优先（越新越前）
+    """
+    def score(item: dict) -> int:
+        s = 0
+        # 名气加分
+        if item.get("_has_fame"):
+            s += 10
+        # 负面传播度加分（命中越多传播度强信号词越高）
+        if item.get("_is_negative"):
+            text = f"{item.get('title', '')} {item.get('summary', '')}"
+            s += sum(3 for w in NEGATIVE_IMPACT_WORDS if w in text)
+            s += 20  # 负面热点本身加分
+        # 有时间加分
+        if item.get("publish_time"):
+            s += 5
+        return s
+
+    return sorted(items, key=score, reverse=True)
 
 
 def filter_by_time(items: list[dict], hours: int) -> list[dict]:
@@ -937,13 +1046,16 @@ def collect_news() -> list[dict]:
 
     logger.info(f"总计收集 {len(all_items)} 条")
 
-    # 去重 -> 相关性过滤 -> 合并同事件
+    # 去重 -> 相关性过滤（含负面传播度筛选）-> 合并同事件 -> 热度排序
     unique = deduplicate(all_items)
     logger.info(f"去重后 {len(unique)} 条")
     relevant = filter_relevant(unique)
     logger.info(f"相关性过滤后 {len(relevant)} 条")
     merged = merge_similar(relevant)
     logger.info(f"同事件合并后 {len(merged)} 条")
+    # 按热度排序：负面热点 + 名气信号 + 时效 综合加权
+    merged = sort_by_popularity(merged)
+    logger.info(f"热度排序完成")
 
     # 补充主题/摘要
     enriched = [enrich_item(it) for it in merged]
