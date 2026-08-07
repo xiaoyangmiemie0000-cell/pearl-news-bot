@@ -59,15 +59,32 @@ HOT_MIN_COUNT = 3              # 热点条数 >=3 才走正常模式
 NORMAL_MAX_COUNT = 8           # 正常模式最多推送条数
 FALLBACK_MAX_COUNT = 4         # 降级模式最多推送条数
 
-# 搜索关键词 - 分组策略
-KEYWORDS_CORE = ["珍珠", "珠宝 珍珠", "珍珠项链", "珍珠首饰"]
-KEYWORDS_EVENT = ["珍珠 新品发布", "珍珠 代言人", "珠宝展 珍珠", "珍珠 拍卖", "珍珠 高定"]
-KEYWORDS_TREND = ["珍珠 时尚", "珍珠 穿搭", "淡水珍珠", "海水珍珠", "巴洛克珍珠", "Akoya 珍珠"]
+# 搜索关键词 - 分组策略（大幅扩充，覆盖整个珠宝行业）
+KEYWORDS_CORE = [
+    "珍珠", "珠宝", "珍珠项链", "珍珠首饰", "珍珠手链", "珍珠耳环",
+]
+KEYWORDS_INDUSTRY = [
+    "钻石 珠宝", "黄金 价格", "翡翠 市场", "宝石 展览",
+    "珠宝 新品发布", "珠宝 品牌", "珠宝 拍卖", "珠宝 高定",
+    "珠宝 时尚", "珠宝 趋势", "奢侈品 珠宝", "腕表 新品",
+    "珠宝 进出口", "黄金 消费", "培育钻石",
+]
+KEYWORDS_EVENT = [
+    "珠宝展", "珠宝 博览会", "珠宝 大会", "珠宝 论坛",
+    "珍珠 代言人", "珠宝 代言人", "珠宝 联名",
+    "苏富比 珠宝", "佳士得 珠宝", "保利 珠宝",
+]
+KEYWORDS_CELEBRITY = [
+    "明星 珠宝", "红毯 珠宝", "珠宝 明星", "珠宝 KOL",
+    "珠宝 同款", "珠宝 带货",
+]
 
-# 过滤词（排除不相关内容）
-FILTER_WORDS = ["珍珠奶茶", "奶茶店", "奶茶品牌", "游戏", "手游", "小说", "漫画",
-                "梦幻西游", "比特币", "BTC", "挖矿", "区块链", "加密货币", "梦幻",
-                "原单", "独家开售", "包邮", "乐高", "航海王", "积木", "喬巴", "代购"]
+# 过滤词（仅保留明确无关的噪声词，避免误杀品牌新品/电商内容）
+FILTER_WORDS = [
+    "珍珠奶茶", "奶茶店", "奶茶品牌",
+    "梦幻西游", "比特币", "BTC", "挖矿", "区块链", "加密货币",
+    "乐高 航海王", "乐高 积木",
+]
 
 # 排除的来源/域名（百科、医疗、电商等非新闻）
 EXCLUDE_DOMAINS = [
@@ -79,17 +96,60 @@ EXCLUDE_DOMAINS = [
     "gpai.net",
 ]
 
-# 强相关关键词：标题必须含其中之一才算珍珠珠宝新闻
-# （弱词如"新品/发布/代言人"不能单独触发，避免"乐高新新品"等误判）
-STRONG_KEYWORDS = [
-    "珍珠", "珠宝", "首饰", "饰品", "项链", "手链", "戒指",
-    "耳环", "胸针", "皇冠", "Mikimoto", "御木本", "京润",
-    "阮仕", "天使之泪", "黛米", "周大福", "周生生", "老凤祥",
-    "卡地亚", "蒂芙尼", "宝格丽", "梵克雅宝",
-    "TASAKI", "塔思琦", "Pandora", "潘多拉", "高定", "高级珠宝",
-    "珠宝展", "拍卖会", "Akoya", "巴洛克",
+# 行业核心词：标题或摘要含任一词即视为珠宝行业相关
+# 覆盖珍珠、钻石、黄金、翡翠、宝石、彩宝、腕表等全品类
+INDUSTRY_CORE_WORDS = [
+    # 品类
+    "珍珠", "钻石", "黄金", "翡翠", "宝石", "彩宝", "红蓝宝",
+    "祖母绿", "和田玉", "白玉", "铂金", "K金", "18K",
+    "腕表", "手表", "高级制表",
+    # 品类词
+    "珠宝", "首饰", "饰品", "项链", "手链", "戒指", "耳环",
+    "耳钉", "手镯", "吊坠", "胸针", "皇冠", "头饰", "脚链",
+    # 工艺/技术
+    "高定", "高级珠宝", "定制珠宝", "天然宝石", "培育钻石", "人工钻石",
+    "GIA", "NGTC", "GRS",
 ]
-# 地名误判排除：标题含"珍珠河/港/岛/镇"等且无珠宝首饰词时排除（如"珍珠河最热"天气新闻）
+
+# 名气信号词：标题或摘要命中即通过（即使不含"珍珠/珠宝"品类词）
+# 涵盖知名品牌、明星、拍卖行、展会、行业机构
+FAMOUS_BRANDS = [
+    # 国际顶级
+    "卡地亚", "Cartier", "蒂芙尼", "Tiffany", "宝格丽", "Bulgari",
+    "梵克雅宝", "Van Cleef", "伯爵", "Piaget",
+    "海瑞温斯顿", "Harry Winston", "格拉夫", "Graff",
+    "布契拉提", "Buccellati", "CINDY CHAO",
+    # 国际知名
+    "Pandora", "潘多拉", "TASAKI", "塔思琦",
+    "Mikimoto", "御木本", "APM", "POMELLATO",
+    # 中国知名
+    "周大福", "周生生", "老凤祥", "六福珠宝", "周宝生",
+    "金至尊", "谢瑞麟", "潮宏基", "老庙", "明牌",
+    "京润珍珠", "阮仕珍珠", "黛米", "淡水珍珠", "千足珍珠",
+    "TTF", "轩灵", "CYoung", "张小葱",
+    # 腕表品牌
+    "劳力士", "Rolex", "百达翡丽", "Patek Philippe",
+    "欧米茄", "Omega", "万国", "IWC", "卡西欧",
+]
+
+# 行业名人/IP（持续扩充）
+FAMOUS_PEOPLE = [
+    # 珠宝行业KOL/设计师
+    "郭培", "Guo Pei", "兰玉", "刘嘉玲", "赵雅芝",
+    # 明星代言/佩戴高频
+    "杨幂", "赵丽颖", "范冰冰", "章子怡", "刘亦菲",
+    "周也", "白鹿", "虞书欣", "迪丽热巴", "古力娜扎",
+    # 拍卖/展览相关
+    "苏富比", "Sotheby", "佳士得", "Christie",
+    "保利", "北京保利", "中国嘉德", "嘉德",
+    # 大型展会
+    "进博会", "消博会", "珠博会", "珠宝展", "钟表展",
+    "巴塞尔", "Basel", "日内瓦", "日内瓦钟表展",
+    # 行业协会
+    "中宝协", "GAC", "中国珠宝玉石首饰行业协会",
+]
+
+# 地名误判排除：标题含"珍珠河/港/岛/镇"等且无珠宝首饰词时排除
 PLACE_NAME_PATTERN = re.compile(r"珍珠[河港岛镇村湾半岛山]")
 
 # 主题分类词典：关键词 -> (主题key)
@@ -413,9 +473,12 @@ def parse_tophub() -> list[dict]:
             title = a.get_text(strip=True)
             if not title or len(title) < 4:
                 continue
-            # 仅保留与珍珠珠宝相关的热搜
-            if not any(kw in title for kw in ["珍珠", "珠宝", "项链", "首饰",
-                                              "饰品", "宝石", "钻石", "翡翠"]):
+            # 仅保留与珠宝/奢侈品/名人相关的热搜
+            hot_keywords = ["珍珠", "珠宝", "项链", "首饰", "饰品", "宝石", "钻石", "翡翠",
+                           "黄金", "腕表", "手表", "奢侈", "品牌", "代言",
+                           "卡地亚", "蒂芙尼", "宝格丽", "周大福", "Pandora",
+                           "TASAKI", "Mikimoto", "珍珠手链", "珍珠项链"]
+            if not any(kw in title for kw in hot_keywords):
                 continue
             link = a.get("href", "")
             if link and not link.startswith("http"):
@@ -543,24 +606,47 @@ def merge_similar(items: list[dict]) -> list[dict]:
 
 # ── 过滤 ──────────────────────────────────────────────────
 def filter_relevant(items: list[dict]) -> list[dict]:
-    """过滤出与珍珠/珠宝强相关的新闻，排除百科、医疗、电商、地名误判等"""
+    """
+    双轨过滤：
+    轨道1（行业核心词）：标题或摘要含珠宝/钻石/黄金/翡翠/腕表等品类词 → 通过
+    轨道2（名气信号词）：标题或摘要含知名品牌/明星/拍卖行/展会名 → 通过
+    （即使不含品类词也通过，因为"卡地亚新品""苏富比拍卖"本身就是珠宝行业内容）
+    """
+    # 预编译：行业核心词（覆盖 title + summary）
+    industry_re = re.compile("|".join(re.escape(w) for w in INDUSTRY_CORE_WORDS), re.I)
+    # 名气信号词（覆盖 title + summary + url）
+    fame_words = FAMOUS_BRANDS + FAMOUS_PEOPLE
+    fame_re = re.compile("|".join(re.escape(w) for w in fame_words), re.I)
+
     filtered = []
     for item in items:
         title = item.get("title", "")
+        summary = item.get("summary", "")
         source = item.get("source", "")
         url = item.get("url", "")
-        # 标题必须含强相关词（珍珠/珠宝/首饰/品牌名等）
-        if not any(kw in title for kw in STRONG_KEYWORDS):
+
+        # 构建综合搜索文本：标题权重最高，摘要次之
+        combined_text = f"{title} {summary}"
+        combined_lower = f"{title} {summary} {source} {url}".lower()
+
+        # 噪声过滤
+        if any(fw in combined_text for fw in FILTER_WORDS):
             continue
-        # 地名误判排除：如"珍珠河最热"是天气新闻，除非标题同时含珠宝首饰词
-        if PLACE_NAME_PATTERN.search(title) and not any(
-            kw in title for kw in ["珠宝", "首饰", "项链", "耳环", "手链", "戒指", "饰品"]
-        ):
+        if any(ex in combined_lower for ex in EXCLUDE_DOMAINS):
             continue
-        combined = f"{title} {source} {url}".lower()
-        if any(ex in combined for ex in EXCLUDE_DOMAINS):
+
+        # 地名误判排除
+        if PLACE_NAME_PATTERN.search(title) and not industry_re.search(combined_text):
             continue
-        filtered.append(item)
+
+        # 双轨判断
+        has_industry = bool(industry_re.search(combined_text))
+        has_fame = bool(fame_re.search(combined_text))
+
+        if has_industry or has_fame:
+            filtered.append(item)
+
+    logger.info(f"相关性过滤: {len(items)} -> {len(filtered)} 条")
     return filtered
 
 
@@ -814,17 +900,19 @@ def collect_news() -> list[dict]:
     except Exception as e:
         logger.error(f"中宝协抓取异常: {e}")
 
-    # 2. Bing News（主力综合源）
+    # 2. Bing News（主力综合源）—— 4组关键词覆盖全行业
     logger.info("=== 抓取 Bing News ===")
-    bing_keywords = KEYWORDS_CORE + KEYWORDS_EVENT + KEYWORDS_TREND
+    bing_keywords = (KEYWORDS_CORE + KEYWORDS_INDUSTRY
+                     + KEYWORDS_EVENT + KEYWORDS_CELEBRITY)
     for kw in bing_keywords:
         try:
             items = parse_bing_news(kw, interval="8")  # 7天内，覆盖降级场景
             all_items.extend(items)
-            logger.info(f"  Bing[{kw}] 获取 {len(items)} 条")
+            if items:
+                logger.info(f"  Bing[{kw}] 获取 {len(items)} 条")
         except Exception as e:
             logger.warning(f"  Bing[{kw}] 异常: {e}")
-        time.sleep(1.0)
+        time.sleep(0.6)
 
     # 3. 今日热榜（社交热点）
     logger.info("=== 抓取今日热榜 ===")
