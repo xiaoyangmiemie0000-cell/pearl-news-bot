@@ -2,13 +2,15 @@ name: 珍珠珠宝新闻日报
 
 on:
   schedule:
-    # 每天 UTC 00:00 运行（北京时间 08:00）
-    - cron: '0 0 * * *'
-  workflow_dispatch: # 支持手动触发
+    # 双触发兜底，规避 GitHub Actions cron 高峰期排队延迟
+    - cron: '0 23 * * *'   # UTC 23:00 = 北京时间 07:00（首次尝试）
+    - cron: '0 0 * * *'    # UTC 00:00 = 北京时间 08:00（兜底）
+  workflow_dispatch:       # 支持手动触发
 
 jobs:
   collect-and-push:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: 检出代码
@@ -26,7 +28,15 @@ jobs:
       - name: 运行新闻收集与推送
         env:
           DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_API_BASE: ${{ secrets.LLM_API_BASE }}
-          LLM_MODEL: ${{ secrets.LLM_MODEL }}
         run: python pearl_news.py
+        continue-on-error: true
+        id: run_main
+
+      - name: 首次失败重试
+        if: steps.run_main.outcome == 'failure'
+        env:
+          DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+        run: |
+          echo "首次运行失败，等待 30 秒后重试..."
+          sleep 30
+          python pearl_news.py
