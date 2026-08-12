@@ -304,6 +304,26 @@ SUMMARY_NOISE = [
     "原标题", "来源：", "责任编辑", "声明：", "推荐阅读",
 ]
 
+# 地点词表（用于摘要第二句提取地点）
+LOCATIONS = [
+    "诸暨", "山下湖", "深圳", "广州", "北京", "上海", "浙江", "广东",
+    "苏州", "北海", "湛江", "海南", "日本", "大溪地", "澳大利亚", "印尼",
+    "菲律宾", "缅甸", "珠海", "义乌", "瑞丽", "番禺", "香港", "巴黎",
+    "米兰", "纽约", "东京", "首尔", "厦门", "青岛", "南京", "杭州",
+    "天津", "重庆", "成都", "武汉", "长沙", "西安",
+]
+
+# 主题对应的趋势观点（末句双引号内容）
+TREND_QUOTES = {
+    "policy":   "政策利好规范发展，行业生态持续向好",
+    "upstream": "上游产能格局优化，供应链韧性增强",
+    "expo":     "展会经济助推品牌曝光，市场活跃度提升",
+    "kol":      "明星效应带动消费热度，品类关注度攀升",
+    "brand":    "品牌力持续提升，产品创新引领趋势",
+    "market":   "市场需求稳健增长，消费升级趋势明显",
+    "other":    "行业关注度走高，细分赛道值得期待",
+}
+
 
 # ── 时间工具 ──────────────────────────────────────────────
 def now_bj() -> datetime:
@@ -940,19 +960,103 @@ def refine_summary(text: str) -> str:
     return s[:120]
 
 
-def enrich_item(item: dict) -> dict:
-    """为单条新闻补充主题、关键数字、精简摘要"""
-    item["topic"] = classify_topic(item)
-    full_text = f"{item.get('title', '')} {item.get('summary', '')}"
+def extract_subject(full_text: str) -> str:
+    """从文本中提取人物/品牌主体名"""
+    for brand in FAMOUS_BRANDS + FAMOUS_PEOPLE:
+        if brand in full_text:
+            return brand
+    return ""
+
+
+def format_digest(item: dict) -> str:
+    """
+    格式化摘要（三段式，限100字）：
+    首句：概括人物+事件+数据
+    次句：补充时间+地点+细节
+    末句：双引号总结趋势/影响
+    """
+    title = item.get("title", "").rstrip("。？！，、；：")
+    raw = refine_summary(item.get("summary", ""))
+    full_text = f"{title} {raw}"
+
+    # ── 提取要素 ──
     numbers = extract_key_numbers(full_text)
-    refined = refine_summary(item.get("summary", ""))
-    # 关键数字前置加粗
-    if numbers and refined:
-        nums_str = "、".join(f"**{n}**" for n in numbers[:3])
-        # 若摘要已含数字，不再重复前缀；否则前置
-        if not any(n in refined for n in numbers[:1]):
-            refined = f"关键数据：{nums_str}。{refined}"
-    item["summary_refined"] = refined
+    subject = extract_subject(full_text)
+    location = ""
+    for loc in LOCATIONS:
+        if loc in full_text:
+            location = loc
+            break
+    t_str = format_time(item.get("publish_time"))
+
+    # ── 首句：人物+事件+数据 ──
+    # 标题即核心事件；品牌/人物仅当不在标题且非地名时前缀
+    first = title
+    if subject and subject not in title and subject not in LOCATIONS:
+        first = f"{subject}{title}"
+    # 数据补充（标题未含时追加）
+    if numbers:
+        nums_missing = [n for n in numbers[:2] if n not in title]
+        if nums_missing:
+            first = f"{first}（{'、'.join(nums_missing)}）"
+
+    # ── 次句：时间+地点+细节 ──
+    detail_parts = []
+    if t_str and t_str != "时间不详":
+        detail_parts.append(t_str)
+    if location:
+        detail_parts.append(location)
+    detail_prefix = "、".join(detail_parts) if detail_parts else ""
+
+    # 摘要细节：取净化后摘要前30字，去除与首句重复的部分
+    detail_body = raw[:30] if raw else ""
+    # 去除标题前缀和品牌名重复
+    for strip_str in [title[:8], subject]:
+        if strip_str and detail_body.startswith(strip_str):
+            detail_body = detail_body[len(strip_str):].lstrip("，。 、")
+    # 去除摘要开头的品牌描述（如"日本珍珠品牌Mikimoto"）
+    if subject and subject in detail_body[:20]:
+        detail_body = detail_body.split(subject, 1)[-1].lstrip("，。 、")
+    # 去除地名残词（如"镇""市""省"开头）
+    detail_body = detail_body.lstrip("省市镇县区村路街道，。 、")
+    if detail_prefix and detail_body:
+        second = f"{detail_prefix}，{detail_body}"
+    elif detail_prefix:
+        second = detail_prefix
+    else:
+        second = detail_body
+
+    # ── 末句：趋势观点 ──
+    topic = item.get("topic", "other")
+    trend = TREND_QUOTES.get(topic, TREND_QUOTES["other"])
+
+    # ── 组合，限100字 ──
+    if second:
+        result = f'{first}。{second}。"{trend}"'
+    else:
+        result = f'{first}。"{trend}"'
+
+    # 超长截断：优先压缩次句
+    if len(result) > 100:
+        if second:
+            # 计算首句+末句固定长度
+            fixed_len = len(f'{first}。"{trend}"')
+            avail = 100 - fixed_len - 4  # 4 = "。..." 的长度
+            if avail > 10:
+                second_short = second[:avail] + "..."
+                result = f'{first}。{second_short}"{trend}"'
+            else:
+                result = f'{first}。"{trend}"'
+        if len(result) > 100:
+            result = result[:97] + "..."
+
+    return result
+
+
+def enrich_item(item: dict) -> dict:
+    """为单条新闻补充主题、格式化摘要"""
+    item["topic"] = classify_topic(item)
+    item["summary_refined"] = format_digest(item)
     return item
 
 
@@ -1045,17 +1149,16 @@ def build_message(items: list[dict], mode: str, date_str: str) -> tuple[str, str
         for it in group[:2]:  # 每组最多2条
             t = it.get("title", "")
             u = it.get("url", "")
-            summary = it.get("summary_refined", "") or refine_summary(it.get("summary", ""))
+            digest = it.get("summary_refined", "")
             src = it.get("source", "")
-            t_str = format_time(it.get("publish_time"))
 
             if u and is_valid_news_url(u):
                 lines.append(f"▶ [{t}]({u})")
             else:
                 lines.append(f"▶ {t}")
-            if summary:
-                lines.append(f"  {summary}")
-            lines.append(f"  📰 {src} · {t_str}\n")
+            if digest:
+                lines.append(f"  > {digest}")
+            lines.append(f"  📰 {src}\n")
         lines.append("")
 
     lines.append("---")
