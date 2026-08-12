@@ -1,10 +1,14 @@
 """
-珍珠珠宝新闻日报聚合器 v2
-从 Bing News、中宝协官网、今日热榜(微博热搜)等多渠道抓取珍珠/珠宝相关新闻，
+珍珠饰品新闻日报聚合器 v3
+从 Bing News、中宝协官网、今日热榜(微博热搜)等多渠道抓取珍珠饰品/珠宝相关新闻，
 按主题分类整理成日报，通过钉钉机器人推送。
 
 核心特性：
 - 多源聚合：中宝协(权威行业) + Bing News(综合) + 今日热榜(社交热点) + 搜狗(备用)
+- 精准品类：8 层过滤确保仅保留珍珠饰品行业内容
+  - 排除药品(珍珠药膏)、化妆品(珍珠面膜)、食材(珍珠奶茶)、日用品等非饰品内容
+  - 检测比喻用法(记忆里的珍珠、珍珠般的智慧)
+  - 必须同时含"珍珠"字样 + 饰品行业上下文(品类词/场景词/材质词/品牌)
 - 真实链接：跟随重定向 + HEAD 校验，过滤失效链接
 - 严格时效：默认仅保留 48h 内热点，无热点时降级到 7d 内精选 2-4 条
 - 主题分类：政策/市场/明星KOL/展会/品牌/产业上游，带 emoji 标注
@@ -102,8 +106,10 @@ EXCLUDE_DOMAINS = [
     "gpai.net",
 ]
 
-# 珍珠品类核心词：标题或摘要含任一词即视为珍珠相关
-# 注意：必须是"珍珠"字样或含"珍珠"的组合词，不包含单独的黄金/钻石/翡翠/腕表
+# 珍珠品类核心词：标题或摘要含任一词即视为"含珍珠"
+# 注意：这是必要不充分条件——还必须满足 JEWELRY_CONTEXT_WORDS（饰品上下文）
+# 或 FAMOUS_BRANDS/FAMOUS_PEOPLE（品牌/名人信号）才能通过
+# 仅"珍珠"字样但无饰品上下文（如药品/食材/比喻）会被后续 Layer 3/6/7 过滤
 PEARL_CORE_WORDS = [
     # 珍珠本词
     "珍珠", "真珠",
@@ -119,9 +125,80 @@ PEARL_CORE_WORDS = [
     "珍珠铂金", "珍珠K金", "珍珠祖母绿",
 ]
 
+# 标题饰品品类词：标题含这些词时，即使"珍珠"只在摘要中也可通过
+# 仅限具体饰品品类，避免"佩戴""时尚"等泛化词导致误判
+TITLE_JEWELRY_WORDS = [
+    "项链", "手链", "耳环", "耳坠", "耳钉", "戒指", "指环",
+    "胸针", "吊坠", "手镯", "头饰", "脚链", "颈饰",
+    "首饰", "饰品", "珠宝",
+]
+
+# 珍珠饰品上下文词：必须至少命中一个，证明是饰品/珠宝行业
+# 与"珍珠"配合使用，确保不是药品、食材、比喻等非饰品语境
+JEWELRY_CONTEXT_WORDS = [
+    # 饰品品类（与珍珠组合的具体品类）
+    "项链", "手链", "耳环", "戒指", "胸针", "吊坠", "手镯", "头饰", "脚链",
+    "耳坠", "耳钉", "指环", "颈饰", "耳饰", "手饰", "脚饰",
+    # 饰品通用词
+    "饰品", "首饰", "珠宝", "配饰", "镶嵌",
+    # 佩戴/展示场景
+    "佩戴", "穿戴", "穿搭", "造型", "盛装", "礼服", "红毯", "出席",
+    # 行业活动/品牌场景
+    "珠宝展", "珠宝节", "饰品展", "时尚", "高定", "定制",
+    "联名", "代言", "新品发布", "系列", "旗舰店",
+    # 交易/市场场景
+    "零售", "销量", "市场", "消费", "出口", "进口",
+    "拍卖", "苏富比", "佳士得",
+    # 工艺/材质
+    "K金", "18K", "14K", "铂金", "黄金", "彩金", "镀金",
+    "镶嵌", "钻石", "宝石", "翡翠", "彩宝", "祖母绿",
+    # 行业特有词
+    "养殖", "蚌", "珠母", "育苗", "插核",
+    "产区", "产量", "进出口", "原石",
+]
+
+# 非饰品行业排除词：命中则直接排除（即使含"珍珠"字样）
+# 覆盖：药品/医疗、化妆品/护肤品、食材/食品、日用品、动植物、农业等
+NON_JEWELRY_EXCLUDE_WORDS = [
+    # 药品/医疗
+    "药膏", "药片", "药丸", "药用", "药材", "滴眼液",
+    "珍珠疹", "珍珠瘤", "珍珠眼", "眼药水", "眼膏",
+    "药监局", "美白剂", "药准字",
+    # 化妆品/护肤品
+    "面膜", "乳液", "面霜", "精华液", "洗面奶", "护肤品",
+    "化妆品", "口红", "粉底", "眼影", "唇釉", "美容",
+    "珍珠粉", "珍珠膏",
+    # 食材/食品
+    "奶茶", "珍珠奶茶", "奶茶店", "饮品", "茶饮",
+    "食用", "食材", "烹饪", "烘焙", "甜品",
+    # 日用品
+    "牙膏", "牙刷", "香皂", "肥皂", "洗手液",
+    "洗衣液", "洗衣粉", "洗洁精",
+    # 珍珠+动植物复合词（非饰品）
+    "珍珠枣", "珍珠梅", "珍珠菜", "珍珠草", "珍珠番茄",
+    "珍珠鸡", "珍珠鸟", "珍珠鱼", "珍珠米", "珍珠棉",
+    "珍珠岩", "珍珠果", "珍珠粟", "珍珠伞",
+    # 农业/种植业
+    "种植", "栽植", "栽培", "农户", "果园", "农产品",
+    "果品", "增产", "增收", "致富", "合作社", "油桃",
+    "油桃", "核桃", "猕猴桃",
+    # 非饰品行业文章标题关键词
+    "数码相机", "选购指南", "选购榜", "相机评测",
+    "AI提示词", "提示词分享", "AI绘画",
+    "排行榜", "推荐榜",
+]
+
+# 比喻用法正则：检测"珍珠"被用作文学比喻而非饰品
+# 例如："记忆里的珍珠"、"人生的珍珠"、"珍珠般的智慧"
+METAPHOR_PATTERNS = [
+    re.compile(r"(?:记忆|回忆|人生|时间|历史|岁月|童年|青春|梦想|希望|往事|故事|智慧|思想)\s*(?:里|中|之|的)?\s*珍珠"),
+    re.compile(r"珍珠\s*(?:般|一样|似的|般的)"),
+    re.compile(r"珍珠\s*(?:光芒|光辉|光彩|品质|精神|气质|灵魂)"),
+]
+
 # 名气信号词（珍珠相关品牌/名人/机构）
-# 注意：名气词命中时，标题或摘要中仍需含"珍珠"字样才能通过
-# （避免"卡地亚发布腕表"这种不涉珍珠的内容误入）
+# 作用：作为饰品行业上下文的替代信号——命中即视为饰品行业内容
+# 注意：仍需先通过 Layer 3（非饰品排除）和 Layer 5（含"珍珠"字样）
 FAMOUS_BRANDS = [
     # 珍珠专业品牌（强相关）
     "Mikimoto", "御木本", "TASAKI", "塔思琦",
@@ -137,7 +214,7 @@ FAMOUS_BRANDS = [
     "TTF", "轩灵", "CYoung",
 ]
 
-# 行业名人/IP（命中时仍需标题/摘要含"珍珠"）
+# 行业名人/IP（同样作为饰品行业上下文的替代信号）
 FAMOUS_PEOPLE = [
     # 珠宝行业KOL/设计师
     "郭培", "Guo Pei", "兰玉", "刘嘉玲", "赵雅芝",
@@ -661,25 +738,40 @@ def is_high_impact_negative(item: dict, combined_text: str) -> bool:
 
 def filter_relevant(items: list[dict]) -> list[dict]:
     """
-    珍珠品类聚焦过滤 + 负面信息传播度筛选。
+    珍珠饰品品类精准过滤 + 负面信息传播度筛选。
 
-    规则：
-    1. 标题或摘要必须含"珍珠"字样（PEARL_CORE_WORDS 命中）—— 确保品类聚焦
-    2. 名气信号词（品牌/明星/拍卖行）作为加分项，但不单独触发通过
-    3. 负面信息：必须命中负面信号词 AND 满足传播度条件（强信号词 OR 权威媒体）
-       - 零散个人投诉/小账号吐槽直接过滤
-       - 通过的负面内容打上 _is_negative 标记，后续按热度排序
+    多层过滤规则（按顺序执行）：
+    1. 噪声词过滤：过滤奶茶、比特币、乐高游戏等明确无关内容
+    2. 域名排除：过滤百科、电商、医疗等非新闻来源
+    3. ★ 非饰品行业排除：命中药品/化妆品/食材/日用品/动植物/农业关键词直接剔除
+       - 例：珍珠药膏（药品）、珍珠面膜（化妆品）、珍珠枣（水果）、珍珠鸡（动物）
+       - 覆盖非饰品标题关键词：数码相机、AI提示词、选购榜等
+    4. 地名误判排除：珍珠路/河/港/岛等地址类误判
+    5. ★ 核心规则1：标题必须含"珍珠"字样（PEARL_CORE_WORDS 在标题中命中）
+       - 仅摘要含"珍珠"但标题不含的不通过（避免相机评测等误入）
+       - 例外：标题含珍珠专业品牌（Mikimoto/TASAKI/京润珍珠等）也算通过
+    6. ★ 核心规则2：标题或摘要含饰品/珠宝行业上下文（JEWELRY_CONTEXT_WORDS 命中）
+       - 品类词：项链、手链、耳环、戒指、胸针...
+       - 场景词：佩戴、穿搭、红毯、珠宝展、拍卖...
+       - 材质词：K金、铂金、黄金、钻石、宝石...
+       - 品牌/名人：FAMOUS_BRANDS + FAMOUS_PEOPLE 命中即可通过
+    7. ★ 比喻用法检测：过滤"记忆里的珍珠""珍珠般的智慧"等文学比喻
+    8. 负面信息筛选：必须命中负面信号词 AND 满足传播度条件
     """
-    # 预编译：珍珠品类核心词
+    # 预编译
     pearl_re = re.compile("|".join(re.escape(w) for w in PEARL_CORE_WORDS), re.I)
-    # 名气信号词
+    context_re = re.compile("|".join(re.escape(w) for w in JEWELRY_CONTEXT_WORDS), re.I)
     fame_words = FAMOUS_BRANDS + FAMOUS_PEOPLE
     fame_re = re.compile("|".join(re.escape(w) for w in fame_words), re.I)
-    # 负面信号词
     negative_re = re.compile("|".join(re.escape(w) for w in NEGATIVE_SIGNAL_WORDS), re.I)
+    exclude_re = re.compile("|".join(re.escape(w) for w in NON_JEWELRY_EXCLUDE_WORDS), re.I)
 
     filtered = []
-    negative_dropped = 0
+    stats = {
+        "noise": 0, "domain": 0, "non_jewelry": 0,
+        "place_name": 0, "no_pearl_title": 0, "no_context": 0,
+        "metaphor": 0, "negative_low": 0,
+    }
     for item in items:
         title = item.get("title", "")
         summary = item.get("summary", "")
@@ -689,48 +781,74 @@ def filter_relevant(items: list[dict]) -> list[dict]:
         combined_text = f"{title} {summary}"
         combined_lower = f"{title} {summary} {source} {url}".lower()
 
-        # 噪声过滤
+        # ── Layer 1: 噪声词过滤 ──
         if any(fw in combined_text for fw in FILTER_WORDS):
-            continue
-        if any(ex in combined_lower for ex in EXCLUDE_DOMAINS):
+            stats["noise"] += 1
             continue
 
-        # 地名误判排除：标题或摘要含"珍珠路/河/港"等且无真正的珍珠首饰词
-        # 处理"珍珠路2号""珍珠河最热"等地址/天气误判
+        # ── Layer 2: 域名排除 ──
+        if any(ex in combined_lower for ex in EXCLUDE_DOMAINS):
+            stats["domain"] += 1
+            continue
+
+        # ── Layer 3: ★ 非饰品行业排除（药品/化妆品/食材/动植物/农业/非饰品标题）──
+        if exclude_re.search(combined_text):
+            stats["non_jewelry"] += 1
+            continue
+
+        # ── Layer 4: 地名误判排除 ──
         if PLACE_NAME_PATTERN.search(combined_text):
-            # 去掉地名上下文后再判断是否还有真正的珍珠内容
             text_without_places = PLACE_NAME_PATTERN.sub("", combined_text)
             if not pearl_re.search(text_without_places):
+                stats["place_name"] += 1
                 continue
-            # 二次确认：剩余的"珍珠"是否都在首饰/珠宝上下文
-            # 检查是否含明确的首饰/珠宝品类词
-            jewelry_words = ["项链", "手链", "耳环", "戒指", "胸针", "吊坠",
-                             "手镯", "头饰", "首饰", "饰品", "珠宝", "配饰",
-                             "佩戴", "珍珠文化", "珍珠之都", "珍珠产业"]
-            if not any(w in text_without_places for w in jewelry_words):
+            if not context_re.search(text_without_places):
+                stats["place_name"] += 1
                 continue
 
-        # ★ 核心规则1：必须含"珍珠"字样
-        has_pearl = bool(pearl_re.search(combined_text))
-        if not has_pearl:
+        # ── Layer 5: ★ 标题必须含"珍珠"字样 或 饰品品类词 或 珍珠品牌 ──
+        # 珍珠必须在标题中出现，或标题含明确饰品品类（项链/耳环等）或品牌名
+        # 避免"数码相机评测"等标题无珍珠、仅在摘要提及的文章误入
+        has_pearl_in_title = bool(pearl_re.search(title))
+        has_jewelry_in_title = any(w in title for w in TITLE_JEWELRY_WORDS)
+        has_fame_in_title = bool(fame_re.search(title))
+        if not (has_pearl_in_title or has_jewelry_in_title or has_fame_in_title):
+            stats["no_pearl_title"] += 1
             continue
 
-        # ★ 核心规则2：负面信息传播度筛选
+        # ── Layer 6: ★ 标题或摘要含饰品/珠宝行业上下文 ──
+        has_context = bool(context_re.search(combined_text))
+        has_fame = bool(fame_re.search(combined_text))
+        if not has_context and not has_fame:
+            stats["no_context"] += 1
+            continue
+
+        # ── Layer 7: ★ 比喻用法检测 ──
+        is_metaphor = any(p.search(combined_text) for p in METAPHOR_PATTERNS)
+        if is_metaphor:
+            stats["metaphor"] += 1
+            continue
+
+        # ── Layer 8: 负面信息传播度筛选 ──
         is_negative = bool(negative_re.search(combined_text))
         if is_negative:
             if not is_high_impact_negative(item, combined_text):
-                negative_dropped += 1
+                stats["negative_low"] += 1
                 continue
-            item["_is_negative"] = True  # 标记，供排序使用
+            item["_is_negative"] = True
 
-        # 名气信号词作为加分标记（不单独触发通过）
-        if fame_re.search(combined_text):
+        if has_fame:
             item["_has_fame"] = True
 
         filtered.append(item)
 
-    logger.info(f"相关性过滤: {len(items)} -> {len(filtered)} 条"
-                f"（负面过滤剔除 {negative_dropped} 条低传播度）")
+    logger.info(
+        f"相关性过滤: {len(items)} -> {len(filtered)} 条 | "
+        f"噪声{stats['noise']} 域名{stats['domain']} "
+        f"非饰品{stats['non_jewelry']} 地名{stats['place_name']} "
+        f"标题无珍珠{stats['no_pearl_title']} 无上下文{stats['no_context']} "
+        f"比喻{stats['metaphor']} 低传播度{stats['negative_low']}"
+    )
     return filtered
 
 
@@ -1088,7 +1206,13 @@ def main():
             if not ok and mode != "empty":
                 send_alert(webhook_url, "钉钉推送重试3次仍失败，请检查webhook或关键词配置")
         else:
-            # 测试模式：输出到控制台
+            # 测试模式：输出到控制台（Windows GBK 终端需处理 emoji）
+            import sys as _sys
+            _out = _sys.stdout
+            try:
+                _out.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
             print("\n" + "=" * 60)
             print(title)
             print("=" * 60)
